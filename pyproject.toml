@@ -1,0 +1,14 @@
+[project]
+name = "py-api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiofiles>=24.1.0",
+    "fastapi-cache2[redis]>=0.2.2",
+    "fastapi[standard]>=0.115.14",
+    "psycopg2-binary>=2.9.10",
+    "pytest>=8.4.1",
+    "python-multipart>=0.0.20",
+]

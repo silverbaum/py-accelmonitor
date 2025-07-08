@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accelmonitor</title>
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@latest/dist/turbo.es2017-esm.min.js" type="module" defer></script>
+    <script src="https://unpkg.com/alpinejs" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@4.1.0/cdn.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8" defer></script>
+    <link rel="stylesheet" href="https://cdn.simplecss.org/simple.min.css" preload>
+</head>
+<body>
+    
+    <div class="video-list-container" x-data="{ open: true }" style="margin:auto; width: 100%; min-height: 200px;">
+        <div class="video-list-header" style="justify-content: center; gap: 15px;">
+            <h3>Videos</h3>
+            <button @click="open = !open" x-text="open ? 'Hide ' : 'Show'"></button>
+        </div>
+        <div class="video-list-body" style="min-height: 150px;">
+        <ul id="videos" class="video-list" x-show="open" x-transition>
+            <li>Loading...</li>
+        </ul>
+        </div>
+    </div>
+
+    <div class="video-container" style="width:100%;">
+        <video id="videoPlayer" controls preload="metadata" style="display: none;"></video>
+    </div>
+    <div class="plot-container" style="display: flex; justify-content: center; align-items: center; width: 100%;">
+        <div id="acc-plot"></div>
+    </div>
+    
+    
+    <div class="form-container">
+        <h2>Upload Video</h2>
+        <form id="uploadForm" enctype="multipart/form-data" action="/api/videos" method="post">
+            <label for="video">Video</label>
+            <input type="file" id="video" accept="video/*" name="video" required>
+            <label for="name">Title</label>
+            <input type="text" id="name" name="name" placeholder="Title">
+            <label for="start_timestamp">Start Datetime (YYYY-MM-DD HH:MM:SS)</label>
+            <input type="text" id="start_timestamp" name="start_timestamp" placeholder="YYYY-MM-DD HH:MM:SS">
+
+            <label for="video_duration">Duration</label>
+            <input type="text" id="video_duration" name="video_duration" placeholder="Duration">
+            <button type="submit">Upload</button>
+        </form>
+    </div>
+
+        
+    <script> // Video logic
+        const videoList = {{ VideoList | tojson }};
+        console.log(videoList);
+        const baseUrl = window.location.origin;
+        
+        const videoPlayer = document.getElementById("videoPlayer");
+
+        const fetchVideos = async () => {
+            //const res = await fetch(baseUrl + "/api/videos"); // For frontend-only version
+            //const videoList = await res.json();
+            const videos = document.getElementById("videos");
+            videos.innerHTML = "";
+            for (const video of videoList) {
+                console.log(video);
+                const li = document.createElement("li");
+                li.innerHTML = `
+                 <p style="text-decoration: underline; cursor: pointer; width: 20%;">${video.name}</p>
+                 <p style="width: 20%;">${video.video_duration}</p>
+                 <p style="width: 20%;">${new Date(video.start_timestamp).toLocaleString("fi-FI", {timeZone: "Europe/Helsinki"})}</p>
+                 <a href="${baseUrl + video.video_path}" download style="width: 20%;">Download</a>`;
+
+                 li.style.display = "flex";
+                 li.style.justifyContent = "space-between";
+                 li.style.alignItems = "center";
+                 //li.style.alignItems = "center";
+                 li.style.padding = "8px";
+                 li.style.borderBottom = "1px solid #ccc";
+                 li.style.cursor = "pointer";
+
+                videos.appendChild(li);
+                li.addEventListener("click", async (e) => {
+                    Plotter(video)
+                    videoPlayer.src = baseUrl + "/" + video.video_path;
+                    videoPlayer.style.display = "block";
+                    videoPlayer.play();
+                });
+            }
+        }
+        fetchVideos();
+
+        const uploadForm = document.getElementById("uploadForm");
+        uploadForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(uploadForm);
+            
+            // Convert start_timestamp to ISO string
+            formData.set("start_timestamp", new Date(formData.get("start_timestamp")).toISOString());
+
+            const response = await fetch(baseUrl + "/videos", {
+                method: "POST",
+                body: formData
+            });
+            const data = await response.json();
+            console.log(data);
+        });
+
+        /* db is empty for now
+        const fetchVideo = async () => {
+            const response = await fetch(baseUrl + "/api/videos");
+            const data = await response.json();
+            console.log("fetchVideo:", data);
+            videoPlayer.src = data[0].video_path;
+        }
+
+        
+       const fetchVideo = async () => {
+            const response = await fetch(baseUrl + "/api/videos/files");
+            const data = await response.json();
+            console.log(data);
+            videoPlayer.src = baseUrl + data[Object.keys(data)[0]].video_path;
+            //videoPlayer.play();
+        }
+        fetchVideo();
+        */
+        
+    </script>
+
+    <script>
+         // Tag logic
+        class Tag {
+            constructor(mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z, created_at) {
+                this.mac = mac;
+                this.temperature = temperature;
+                this.humidity = humidity;
+                this.pressure = pressure;
+                this.acceleration_x = acceleration_x;
+                this.acceleration_y = acceleration_y;
+                this.acceleration_z = acceleration_z;
+                this.created_at = created_at;
+            }
+        }
+        
+
+        const fetchTags = async (video) => {
+            // Fetch tags from 1 hour before and 1 hour after the video start time
+            const start = new Date(video.start_timestamp);
+            start.setHours(start.getHours() - 1);
+            const end = new Date(start.getTime() + video.video_duration * 1000);
+            end.setHours(end.getHours() + 1);
+
+            console.log("start:", start, "end:", end);
+            
+            let tags = {};
+            const tagsURL = window.location.origin + "/tags/range/" + start.toISOString() + "/" + end.toISOString();
+            console.log("tagsURL:", tagsURL);
+
+            const tagResponse = await fetch(tagsURL);
+            
+            const tagsData = await tagResponse.json();
+            
+            for (const tag of tagsData[0]) {
+                const tagObject = new Tag(tag.mac, tag.temperature, tag.humidity, tag.pressure, tag.acceleration_x, tag.acceleration_y, tag.acceleration_z, tag.created_at);
+                if (!tags[tagObject.mac]) {
+                    tags[tagObject.mac] = [];
+                }
+                tags[tagObject.mac].push(tagObject);
+            }
+            console.log(tags);
+            return tags;
+        }
+
+
+        // Plot logic
+        var layout = {
+            autosize: true,
+            width: 1000,
+            height: 500,
+            xaxis: {
+                autorange: true,
+                rangeslider: {autorange: true, bgcolor: "#222"},
+                color: "#e0e0e0",
+                gridcolor: "#333",
+                zerolinecolor: "#444",
+                automargin: true
+            },
+            yaxis: {
+                color: "#ffffff",
+                gridcolor: "#333",
+                zerolinecolor: "#444",
+                automargin: true
+            },
+            paper_bgcolor: "#212121",
+            plot_bgcolor: "#212121",
+            font: { color: "#e0e0e0" },
+            legend: { font: { color: "#e0e0e0" }, bgcolor: "#111" }
+        }
+
+        const plotTags = (tags) => {
+            const data = [
+                {
+                    x: tags[Object.keys(tags)[0]].map(tag => new Date(tag.created_at)),
+                    y: tags[Object.keys(tags)[0]].map(tag => tag.acceleration_x),
+                    type: "scatter",
+                    mode: "lines+markers",
+                    name: Object.keys(tags)[0] + " x"
+                },
+                {
+                    x: tags[Object.keys(tags)[0]].map(tag => new Date(tag.created_at)),
+                    y: tags[Object.keys(tags)[0]].map(tag => tag.acceleration_y),
+                    type: "scatter",
+                    mode: "lines+markers",
+                    name: Object.keys(tags)[0] + " y"
+                },
+                {
+                    x: tags[Object.keys(tags)[0]].map(tag => new Date(tag.created_at)),
+                    y: tags[Object.keys(tags)[0]].map(tag => tag.acceleration_z),
+                    type: "scatter",
+                    mode: "lines+markers",
+                    name: Object.keys(tags)[0] + " z"
+                }
+            ]
+            console.log(data)
+
+            const config = {
+                responsive: true
+            }
+            Plotly.newPlot("acc-plot", data, {...layout, template: "plotly_dark"}, config);
+        }
+   
+        
+        function Plotter(video) {
+            // .then ensures the tags are fetched before plotting
+            fetchTags(video).then(tags => {
+                plotTags(tags);
+                 // First tag's timestamp
+
+                videoPlayer.addEventListener("timeupdate", async function() {
+                    try {
+                        const videoStartTime = new Date(video.start_timestamp);
+
+                        let videoOffset = videoPlayer.currentTime; // seconds
+                        console.log("videoOffset:", videoOffset);
+
+
+                        let windowStart = new Date(videoStartTime.getTime() + (videoOffset) * 1000 - 10000); // 10 seconds before tag
+                        console.log("windowStart:", windowStart);
+                        let windowEnd = new Date(windowStart.getTime() + 30000); // 30 seconds
+
+                        await Plotly.relayout("acc-plot", {
+                            "xaxis.range": [windowStart, windowEnd]
+                        });
+                        
+                    } catch (err) {
+                        console.error("Error updating plot:", err);
+                    }
+                });
+            });
+        }
+
+
+        
+    </script>
+</body>
+</html>

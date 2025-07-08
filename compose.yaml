@@ -1,0 +1,24 @@
+services:
+  postgres:
+    image: "postgres"
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+  valkey:
+    image: "valkey/valkey"
+    ports:
+      - "127.0.0.1:6379:6379"
+  pynolith:
+    image: pynolith
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    depends_on:
+      - valkey
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres
+      - REDIS_URL=redis://valkey:6379
+    ports:
+      - 8000:8000
