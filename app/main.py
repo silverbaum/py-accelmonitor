@@ -21,7 +21,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import aiofiles
-import json
 
 db_pool = None
 
@@ -29,7 +28,30 @@ db_pool = None
 async def lifespan(_: FastAPI):
     global db_pool
     print("Creating connection pool")
-    db_pool = ThreadedConnectionPool(1, 10, getenv("DATABASE_URL"))
+    db_pool = ThreadedConnectionPool(1, 20, getenv("DATABASE_URL"))
+    with db_pool.getconn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""CREATE TABLE IF NOT EXISTS tags (
+            id serial PRIMARY KEY,
+            mac text,
+            temperature numeric,
+            humidity numeric,
+            pressure numeric,
+            acceleration_x numeric NOT NULL,
+            acceleration_y numeric NOT NULL,
+            acceleration_z numeric NOT NULL,
+            created_at timestamptz DEFAULT now()
+            );
+
+            CREATE TABLE IF NOT EXISTS videos (
+            id serial PRIMARY KEY,
+            name text,
+            start_timestamp timestamptz,
+            video_duration text,
+            video_path text
+            );
+            """)
+        conn.commit()
 
     redis = aioredis.from_url(getenv("REDIS_URL"))
     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")

@@ -1,6 +1,12 @@
 services:
   postgres:
     image: "postgres"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+      start_period: 5s
+      timeout: 5s
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
@@ -15,8 +21,11 @@ services:
       context: .
       dockerfile: ./Dockerfile
     depends_on:
-      - valkey
-      - postgres
+      valkey:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+        restart: true
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres
       - REDIS_URL=redis://valkey:6379
