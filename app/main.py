@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, Request, Form, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
+# from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,8 +15,8 @@ from fastapi_cache.backends.redis import RedisBackend
 from redis import asyncio as aioredis
 
 from datetime import datetime
-from os import getenv
 from dotenv import load_dotenv # .env
+import os
 
 import aiofiles # async file ops for video saving
 
@@ -50,7 +50,7 @@ db_pool = None
 async def lifespan(_: FastAPI):
     global db_pool
     print("Creating connection pool")
-    db_pool = ThreadedConnectionPool(1, 20, getenv("DATABASE_URL"))
+    db_pool = ThreadedConnectionPool(1, 20, os.getenv("DATABASE_URL"))
     with db_pool.getconn() as conn:
         with conn.cursor() as cur:
             cur.execute("""CREATE TABLE IF NOT EXISTS tags (
@@ -66,16 +66,17 @@ async def lifespan(_: FastAPI):
             );
 
             CREATE TABLE IF NOT EXISTS videos (
-            id serial PRIMARY KEY,
-            name text,
-            start_timestamp timestamptz,
-            video_duration text,
-            video_path text
+            id serial PRIMARY KEY NOT NULL UNIQUE,
+            name text NOT NULL UNIQUE,
+            start_timestamp timestamptz NOT NULL,
+            video_duration numeric,
+            video_path text UNIQUE NOT NULL,
+            created_at timestamptz DEFAULT now()
             );
             """)
         conn.commit()
 
-    redis = aioredis.from_url(getenv("REDIS_URL"))
+    redis = aioredis.from_url(os.getenv("REDIS_URL"))
     FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
     print("Redis cache initialized")
 
@@ -89,12 +90,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # !!, change to frontend url
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 app.mount("/videos", StaticFiles(directory="videos"), name="videos")
@@ -125,7 +121,7 @@ async def root(request: Request, db_conn = Depends(get_db)):
         )
     
 
-@app.post("/tags", status_code=201)
+@app.post("/api/tags", status_code=201)
 async def create_tag(body: GatewayHTTPRequest, db_conn = Depends(get_db)):
     print(body.data)
     with db_conn.cursor() as cursor:
@@ -140,7 +136,7 @@ async def create_tag(body: GatewayHTTPRequest, db_conn = Depends(get_db)):
     return {"message": "Tags created", "data": body.data.tags}
 
 
-@app.get("/tags")
+@app.get("/api/tags")
 @cache(expire=5)
 async def get_tags(db_conn = Depends(get_db)):
     with db_conn.cursor() as cursor:
@@ -150,7 +146,7 @@ async def get_tags(db_conn = Depends(get_db)):
     return tags, 200
 
 
-@app.get("/tags/range/{start}/{end}")
+@app.get("/api/tags/range/{start}/{end}")
 @cache(expire=720, key_builder=lambda *args, **_: f"tags_range:{args[0]}:{args[1]}")
 async def get_tags_range(start: str, end: str, db_conn = Depends(get_db)):
     print(start, end)
@@ -168,7 +164,7 @@ async def get_tags_range(start: str, end: str, db_conn = Depends(get_db)):
         return {"message": "Tag retrieval failed", "error": str(e)}, 500
     return tags, 200
 
-@app.post("/videos", status_code=201)
+@app.post("/api/videos", status_code=201)
 async def save_video(
         video: UploadFile = File(...),
         name: str = Form(...),
@@ -192,3 +188,20 @@ async def save_video(
         print(e)
         return {"message": "Failed to save video", "error": str(e)}, 500
 
+
+@app.delete("/api/videos/{video_name}", status_code=304)
+async def delete_video(video_name: str, db_conn = Depends(get_db)):
+    try:
+        with db_conn.cursor() as cursor:
+            video = video_name.split('.')[0]
+            cursor.execute("DELETE FROM videos WHERE name = %s", (video,))
+            db_conn.commit()
+        
+        video_path = f"./videos/{video_name}"
+        if os.path.exists(video_path):
+            os.remove(video_path)
+        
+        return {"message": "Video deleted"}
+    except Exception as e:
+        print(e)
+        return {"message": "Failed to delete video", "error": str(e)}, 500

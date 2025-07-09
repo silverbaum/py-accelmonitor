@@ -23,7 +23,7 @@ const fetchTags = async (video) => {
     console.log("start:", start, "end:", end);
     
     let tags = {};
-    const tagsURL = window.location.origin + "/tags/range/" + start.toISOString() + "/" + end.toISOString();
+    const tagsURL = window.location.origin + "/api/tags/range/" + start.toISOString() + "/" + end.toISOString();
     console.log("tagsURL:", tagsURL);
 
     const tagResponse = await fetch(tagsURL);
