@@ -96,7 +96,7 @@ def test_create_tag(setup_test_db):
             }
         }
     }
-    response = client.post("/tags", json=payload)
+    response = client.post("/api/tags", json=payload)
     assert response.status_code == 201
     assert response.json() == {
         "message": "Tags created",
@@ -112,7 +112,7 @@ def test_tags_range(setup_test_db):
         end.replace(minute=end.minute + 10)
     else:
         end.replace(minute=end.minute - 10)
-    response = client.get(f"/tags/range/{start}/{end}")
+    response = client.get(f"/api/tags/range/{start}/{end}")
     assert response.is_success
 
 
