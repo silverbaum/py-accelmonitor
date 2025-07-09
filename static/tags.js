@@ -41,6 +41,30 @@ const fetchTags = async (video) => {
     return tags;
 }
 
+const csvForm = document.getElementById("csvForm");
+const csvDownloadButton = document.getElementById("csvDownloadButton");
+csvForm.addEventListener("change", (e) => {
+    e.preventDefault();
+    const csvFormData = new FormData(csvForm);
+    const start = csvFormData.get("start");
+    const end = csvFormData.get("end");
+
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    if (startDate >= endDate) {
+        alert("Start date must be before end date.");
+        return;
+    }
+    
+    const csvURL = window.location.origin + "/api/tags/csv?start=" + startDate.toISOString() + "&end=" + endDate.toISOString();
+    console.log("csvURL:", csvURL);
+    
+    csvDownloadButton.href = csvURL
+    csvDownloadButton.download = `tags_${start}_${end}.csv`; // Set the download filename
+    //csvDownloadButton.click();
+});
+
+
 
 // Plot logic
 var layout = {

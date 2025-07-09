@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, Request, Form, UploadFile, File
 # from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.encoders import jsonable_encoder
 
@@ -19,6 +19,9 @@ from dotenv import load_dotenv # .env
 import os
 
 import aiofiles # async file ops for video saving
+import tempfile
+import csv
+import logging
 
 class Tag(BaseModel):
     mac: str
@@ -115,7 +118,6 @@ async def root(request: Request, db_conn = Depends(get_db)):
             columns = [col[0] for col in cursor.description]
             videos_json = [dict(zip(columns, row)) for row in videos]
             
-
         return templates.TemplateResponse(
             request, "index.html", context={"VideoList": jsonable_encoder(videos_json)}
         )
@@ -130,7 +132,7 @@ async def create_tag(body: GatewayHTTPRequest, db_conn = Depends(get_db)):
                 cursor.execute("INSERT INTO tags (mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                             (tag.mac, tag.temperature, tag.humidity, tag.pressure, tag.acceleration_x, tag.acceleration_y, tag.acceleration_z))
         except Exception as e:
-            print(e)
+            logging.exception("Error inserting tags into database", exc_info=e)
             return {"message": "Tag creation failed", "data": body.data.tags, "error": str(e)}, 500
     db_conn.commit()
     return {"message": "Tags created", "data": body.data.tags}
@@ -160,9 +162,37 @@ async def get_tags_range(start: str, end: str, db_conn = Depends(get_db)):
                 columns = [col[0] for col in cursor.description]
                 tags = [dict(zip(columns, row)) for row in cursor.fetchall()]
     except Exception as e:
-        print(e)
+        logging.exception("Error retrieving tags in range", exc_info=e)
         return {"message": "Tag retrieval failed", "error": str(e)}, 500
     return tags, 200
+
+
+@app.get("/api/tags/csv")
+async def get_tags_csv(start: str, end: str, db_conn = Depends(get_db)):
+    try:
+        start_date = datetime.fromisoformat(start)
+        end_date = datetime.fromisoformat(end)
+        logging.info("start_date:", start_date, "end_date", end_date)
+
+        with db_conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM tags WHERE created_at BETWEEN %s AND %s", (start_date, end_date))
+            columns = [col[0] for col in cursor.description]
+            tags = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        with tempfile.NamedTemporaryFile(delete=False, mode='w', newline='') as tmp_file:
+            writer = csv.DictWriter(tmp_file, fieldnames=columns)
+            writer.writeheader()
+            for tag in tags:
+                writer.writerow(tag)
+        
+            return FileResponse(
+                tmp_file.name,
+                media_type='text/csv',
+                filename=f"tags_{start_date.isoformat()}_{end_date.isoformat()}.csv"
+            )
+    except Exception as e:
+        logging.exception("Error generating CSV", exc_info=e)
+        return {"message": "Failed to generate CSV", "error": str(e)}, 500
+
 
 @app.post("/api/videos", status_code=201)
 async def save_video(
@@ -185,7 +215,7 @@ async def save_video(
             
         return {"message": "Video saved", "data": {"name": name, "start_timestamp": start_timestamp, "video_duration": video_duration, "video_path": video_path}}
     except Exception as e:
-        print(e)
+        logging.exception("Error saving video", exc_info=e)
         return {"message": "Failed to save video", "error": str(e)}, 500
 
 
@@ -203,5 +233,5 @@ async def delete_video(video_name: str, db_conn = Depends(get_db)):
         
         return {"message": "Video deleted"}
     except Exception as e:
-        print(e)
+        logging.exception("Error deleting video", exc_info=e)
         return {"message": "Failed to delete video", "error": str(e)}, 500
