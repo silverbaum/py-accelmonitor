@@ -1,0 +1,54 @@
+name: Python API
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+      valkey:
+        image: valkey/valkey:latest
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: astral-sh/setup-uv
+  # You may pin to the exact commit or the version.
+  # uses: astral-sh/setup-uv@bd01e18f51369d5a26f1651c3cb451d3417e3bba
+      uses: astral-sh/setup-uv@v6.3.1
+      with:
+        # The version of Python to set UV_PYTHON to
+        python-version: 3.13 # optional
+        # Use uv venv to activate a venv ready to be used by later steps. 
+        activate-environment: true # optional, default is false
+        # The directory to execute all commands in and look for files such as pyproject.toml
+        working-directory: ${{ github.workspace }}/py_api
+    - name: Install dependencies
+      working-directory: ${{ github.workspace }}/py_api
+      run: |
+        uv sync
+    - name: Test with pytest
+      working-directory: ${{ github.workspace }}/py_api
+      env:
+        REDIS_URL: rediss://localhost:6379
+        TEST_DATABASE_URL: postgresql://user:password@localhost:5432/testdb
+      run: |
+        pytest

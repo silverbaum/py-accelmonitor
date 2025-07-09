@@ -1,16 +1,21 @@
 from fastapi.testclient import TestClient
 from psycopg2.pool import ThreadedConnectionPool
 
+from fastapi_cache import FastAPICache
+from fastapi_cache.decorator import cache
+from fastapi_cache.backends.redis import RedisBackend
+from redis import asyncio as aioredis
+
 from dotenv import load_dotenv
 load_dotenv()
 from os import getenv
 from random import randint
 
 from pytest import fixture
+import datetime
 
 from .main import app, get_db
 
-db_test_pool = None
 
 @fixture
 def setup_test_db():
@@ -18,44 +23,58 @@ def setup_test_db():
     db_test_pool = ThreadedConnectionPool(1, 10, getenv("TEST_DATABASE_URL"))
     conn = db_test_pool.getconn()
     c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS tags (\
-        id SERIAL PRIMARY KEY,\
-        mac VARCHAR(20) NOT NULL,\
-        temperature NUMERIC,\
-        humidity NUMERIC,\
-        pressure NUMERIC,\
-        acceleration_x NUMERIC NOT NULL,\
-        acceleration_y NUMERIC NOT NULL,\
-        acceleration_z NUMERIC NOT NULL,\
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now())")
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS tags (
+        id SERIAL PRIMARY KEY,
+        mac TEXT NOT NULL,
+        temperature NUMERIC,
+        humidity NUMERIC,
+        pressure NUMERIC,
+        acceleration_x NUMERIC NOT NULL,
+        acceleration_y NUMERIC NOT NULL,
+        acceleration_z NUMERIC NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now());
+    CREATE TABLE IF NOT EXISTS videos (
+        id serial PRIMARY KEY,
+        name text,
+        start_timestamp timestamptz,
+        video_duration text,
+        video_path text
+        );
+    """)
     c.execute("CREATE INDEX IF NOT EXISTS tags_mac_idx ON tags (mac)")
     conn.commit()
     conn.close()
     db_test_pool.putconn(conn)
+
+    redis = aioredis.from_url(getenv("REDIS_URL"))
+    FastAPICache.init(RedisBackend(redis), prefix="fastapi-cache")
+
     try:
         yield db_test_pool
     finally:
         conn = db_test_pool.getconn()
-        conn.cursor().execute("DELETE FROM tags")
+        conn.cursor().execute("DELETE FROM tags; DELETE FROM videos;")
         conn.commit()
         conn.close()
         db_test_pool.closeall()
+        close = redis.close()
+        close.close()
      
 
 
 def get_test_db():
-        return db_test_pool.getconn()
+    conn = db_test_pool.getconn()
+    yield conn
 
 client = TestClient(app)
 
 
 app.dependency_overrides[get_db] = get_test_db
 
-def test_root():
+def test_root(setup_test_db):
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello from the tags API!"}
-
 
 def test_create_tag(setup_test_db):
     mac = "12:34:56:78:90:AB"
@@ -77,7 +96,7 @@ def test_create_tag(setup_test_db):
             }
         }
     }
-    response = client.post("/tags/new", json=payload)
+    response = client.post("/tags", json=payload)
     assert response.status_code == 201
     assert response.json() == {
         "message": "Tags created",
@@ -85,3 +104,15 @@ def test_create_tag(setup_test_db):
             mac: tag_data
         }
     }
+
+def test_tags_range(setup_test_db):
+    start = datetime.datetime.now().isoformat()
+    end = datetime.datetime.now()
+    if end.minute < 50:
+        end.replace(minute=end.minute + 10)
+    else:
+        end.replace(minute=end.minute - 10)
+    response = client.get(f"/tags/range/{start}/{end}")
+    assert response.is_success
+
+

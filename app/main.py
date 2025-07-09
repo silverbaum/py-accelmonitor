@@ -16,12 +16,34 @@ from redis import asyncio as aioredis
 
 from datetime import datetime
 from os import getenv
-from dotenv import load_dotenv
+from dotenv import load_dotenv # .env
+
+import aiofiles # async file ops for video saving
+
+class Tag(BaseModel):
+    mac: str
+    temperature: float
+    humidity: float
+    pressure: float
+    acceleration_x: float
+    acceleration_y: float
+    acceleration_z: float
+
+class GatewayData(BaseModel):
+    gwmac: str
+    tags: dict[str, Tag]
+
+class GatewayHTTPRequest(BaseModel):
+    data: GatewayData
+
+class Video (BaseModel):
+    name:            str
+    start_timestamp: datetime
+    video_duration:  str
+    video_path:      str
+
 
 load_dotenv()
-
-import aiofiles
-
 db_pool = None
 
 @asynccontextmanager
@@ -88,33 +110,6 @@ def get_db():
     finally:
         db_pool.putconn(conn)
 
-
-class Tag(BaseModel):
-    mac: str
-    temperature: float
-    humidity: float
-    pressure: float
-    acceleration_x: float
-    acceleration_y: float
-    acceleration_z: float
-
-class GatewayData(BaseModel):
-    gwmac: str
-    tags: dict[str, Tag]
-
-class GatewayHTTPRequest(BaseModel):
-    data: GatewayData
-
-class Video (BaseModel):
-    name:            str
-    start_timestamp: datetime
-    video_duration:  str
-    video_path:      str
-
-class VideoForm(BaseModel):
-    name: str
-    start_timestamp: str
-    video_duration: str
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request, db_conn = Depends(get_db)):
