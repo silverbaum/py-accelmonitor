@@ -40,13 +40,13 @@ jobs:
         # Use uv venv to activate a venv ready to be used by later steps. 
         activate-environment: true # optional, default is false
         # The directory to execute all commands in and look for files such as pyproject.toml
-        working-directory: ${{ github.workspace }}/py_api
+        working-directory: ${{ github.workspace }}
     - name: Install dependencies
-      working-directory: ${{ github.workspace }}/py_api
+      working-directory: ${{ github.workspace }}
       run: |
         uv sync
     - name: Test with pytest
-      working-directory: ${{ github.workspace }}/py_api
+      working-directory: ${{ github.workspace }}
       env:
         REDIS_URL: rediss://localhost:6379
         TEST_DATABASE_URL: postgresql://user:password@localhost:5432/testdb
