@@ -2,19 +2,19 @@ from fastapi.testclient import TestClient
 from psycopg2.pool import ThreadedConnectionPool
 
 from fastapi_cache import FastAPICache
-from fastapi_cache.decorator import cache
 from fastapi_cache.backends.redis import RedisBackend
 from redis import asyncio as aioredis
 
 from dotenv import load_dotenv
-load_dotenv()
 from os import getenv
 from random import randint
 
 from pytest import fixture
-import datetime
 
+import datetime
 from .main import app, get_db
+
+load_dotenv()
 
 
 @fixture
@@ -60,21 +60,23 @@ def setup_test_db():
         db_test_pool.closeall()
         close = redis.close()
         close.close()
-     
 
 
 def get_test_db():
     conn = db_test_pool.getconn()
     yield conn
 
+
 client = TestClient(app)
 
 
 app.dependency_overrides[get_db] = get_test_db
 
+
 def test_root(setup_test_db):
     response = client.get("/")
     assert response.status_code == 200
+
 
 def test_create_tag(setup_test_db):
     mac = "12:34:56:78:90:AB"
@@ -85,25 +87,14 @@ def test_create_tag(setup_test_db):
         "pressure": randint(90000, 101300),
         "acceleration_x": randint(-1000, 1000),
         "acceleration_y": randint(-1000, 1000),
-        "acceleration_z": randint(-1000, 1000)
+        "acceleration_z": randint(-1000, 1000),
     }
 
-    payload = {
-        "data": {
-            "gwmac": mac,
-            "tags": {
-                mac: tag_data
-            }
-        }
-    }
+    payload = {"data": {"gwmac": mac, "tags": {mac: tag_data}}}
     response = client.post("/api/tags", json=payload)
     assert response.status_code == 201
-    assert response.json() == {
-        "message": "Tags created",
-        "data": {
-            mac: tag_data
-        }
-    }
+    assert response.json() == {"message": "Tags created", "data": {mac: tag_data}}
+
 
 def test_tags_range(setup_test_db):
     start = datetime.datetime.now().isoformat()
@@ -114,5 +105,3 @@ def test_tags_range(setup_test_db):
         end.replace(minute=end.minute - 10)
     response = client.get(f"/api/tags/range/{start}/{end}")
     assert response.is_success
-
-
