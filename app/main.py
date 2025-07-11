@@ -15,6 +15,7 @@ from redis import asyncio as aioredis
 
 from datetime import datetime
 from dotenv import load_dotenv  # .env
+from pydantic import BaseModel
 
 import os
 import aiofiles  # async file ops for video saving
@@ -22,7 +23,32 @@ import tempfile
 import csv
 import logging
 
-from .schema import GatewayHTTPRequest
+
+class Tag(BaseModel):
+    mac: str
+    temperature: float
+    humidity: float
+    pressure: float
+    acceleration_x: float
+    acceleration_y: float
+    acceleration_z: float
+
+
+class GatewayData(BaseModel):
+    gwmac: str
+    tags: dict[str, Tag]
+
+
+class GatewayHTTPRequest(BaseModel):
+    data: GatewayData
+
+
+class Video(BaseModel):
+    name: str
+    start_timestamp: datetime
+    video_duration: str
+    video_path: str
+
 
 load_dotenv()
 
