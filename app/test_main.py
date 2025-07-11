@@ -92,7 +92,7 @@ def test_create_tag(setup_test_db):
         "timestamp": None
     }
 
-    payload = {"data": {"gwmac": mac, "timestamp": datetime.datetime.now().timestamp(), "coordinates": "", "tags": {mac: tag_data}}}
+    payload = {"data": {"gw_mac": mac, "timestamp": datetime.datetime.now().timestamp(), "coordinates": "", "tags": {mac: tag_data}}}
     response = client.post("/api/tags", json=payload)
     data: dict = response.json()
     

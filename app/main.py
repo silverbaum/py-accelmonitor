@@ -39,7 +39,8 @@ class Tag(BaseModel):
 class GatewayData(BaseModel):
     timestamp: float | None = None
     coordinates: str | None = None
-    gwmac: str
+    gw_mac: str
+    nonce: int | None = None
     tags: dict[str, Tag]
 
 
