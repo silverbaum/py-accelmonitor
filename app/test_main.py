@@ -88,12 +88,17 @@ def test_create_tag(setup_test_db):
         "acceleration_x": randint(-1000, 1000),
         "acceleration_y": randint(-1000, 1000),
         "acceleration_z": randint(-1000, 1000),
+        "rssi": None,
+        "timestamp": None
     }
 
-    payload = {"data": {"gwmac": mac, "tags": {mac: tag_data}}}
+    payload = {"data": {"gwmac": mac, "timestamp": datetime.datetime.now().timestamp(), "coordinates": "", "tags": {mac: tag_data}}}
     response = client.post("/api/tags", json=payload)
+    data: dict = response.json()
+    
     assert response.status_code == 201
-    assert response.json() == {"message": "Tags created", "data": {mac: tag_data}}
+    assert data["message"] == "Tags created"
+    assert data["data"][mac] == tag_data
 
 
 def test_tags_range(setup_test_db):
