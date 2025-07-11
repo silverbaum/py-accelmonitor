@@ -106,18 +106,19 @@ async def create_tag(body: GatewayHTTPRequest, db_conn=Depends(get_db)):
     with db_conn.cursor() as cursor:
         try:
             for tag in body.data.tags.values():
-                cursor.execute(
-                    "INSERT INTO tags (mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                    (
-                        tag.mac,
-                        tag.temperature,
-                        tag.humidity,
-                        tag.pressure,
-                        tag.acceleration_x,
-                        tag.acceleration_y,
-                        tag.acceleration_z,
-                    ),
-                )
+                if tag.mac == "5F:8F:BC:B9:EA:B4:19":
+                    cursor.execute(
+                        "INSERT INTO tags (mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                        (
+                            tag.mac,
+                            tag.temperature,
+                            tag.humidity,
+                            tag.pressure,
+                            tag.acceleration_x,
+                            tag.acceleration_y,
+                            tag.acceleration_z,
+                        ),
+                    )
         except Exception as e:
             logging.exception("Error inserting tags into database", exc_info=e)
             return {
