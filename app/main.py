@@ -32,13 +32,13 @@ class Tag(BaseModel):
     acceleration_x: float
     acceleration_y: float
     acceleration_z: float
-    rssi: int = 0
-    timestamp: int = 0
+    rssi: int | None = None
+    timestamp: int | None = None
 
 
 class GatewayData(BaseModel):
-    timestamp: int = 0
-    coordinates: str = ""
+    timestamp: int | None = None
+    coordinates: str | None = None
     gwmac: str
     tags: dict[str, Tag]
 
@@ -56,6 +56,7 @@ class Video(BaseModel):
 
 load_dotenv()
 
+db_pool: ThreadedConnectionPool | None = None
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
