@@ -32,9 +32,13 @@ class Tag(BaseModel):
     acceleration_x: float
     acceleration_y: float
     acceleration_z: float
+    rssi: int = 0
+    timestamp: int = 0
 
 
 class GatewayData(BaseModel):
+    timestamp: int = 0
+    coordinates: str = ""
     gwmac: str
     tags: dict[str, Tag]
 
