@@ -1,4 +1,5 @@
  // Tag logic
+
  class Tag {
     constructor(mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z, created_at) {
         this.mac = mac;
@@ -15,10 +16,14 @@
 
 const fetchTags = async (video) => {
     // Fetch tags from 1 hour before and 1 hour after the video start time
-    const start = new Date(video.start_timestamp);
-    start.setHours(start.getHours() - 1);
-    const end = new Date(start.getTime() + video.video_duration * 1000);
-    end.setHours(end.getHours() + 1);
+    const start_t = new Date(video.start_timestamp);
+    //const start = new Date(start_t.getTime() - (60 * 1000 * 5));
+    const start = dateFns.sub(start_t, {minutes: 5});
+
+    //const end_t = new Date(start.getTime() + video.video_duration * 1000);
+    const end = dateFns.add(new Date(start.getTime() + video.video_duration * 1000), {
+        minutes: 10
+    });
 
     console.log("start:", start, "end:", end);
     
@@ -140,7 +145,7 @@ function Plotter(video) {
 
                 let windowStart = new Date(videoStartTime.getTime() + (videoOffset) * 1000 - 10000); // 10 seconds before tag
                 console.log("windowStart:", windowStart);
-                let windowEnd = new Date(windowStart.getTime() + 30000); // 30 seconds
+                let windowEnd = new Date(videoStartTime.getTime() + (videoOffset) * 1000); // 10 seconds
 
                 await Plotly.relayout("acc-plot", {
                     "xaxis.range": [windowStart, windowEnd]
