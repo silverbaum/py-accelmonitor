@@ -32,7 +32,7 @@ services:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/postgres
       - REDIS_URL=redis://valkey:6379
     ports:
-      - 8000:8000
+      - 127.0.0.1:6000:6000
 
 volumes:
   postgres_data:
