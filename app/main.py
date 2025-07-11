@@ -25,15 +25,15 @@ import logging
 
 
 class Tag(BaseModel):
-    mac: str
+    id: str
     temperature: float
     humidity: float
     pressure: float
-    acceleration_x: float
-    acceleration_y: float
-    acceleration_z: float
-    rssi: int | None = None
-    timestamp: float | None = None
+    accelX: float
+    accelY: float
+    accelZ: float
+    movementCounter: int | None = None
+
 
 
 class GatewayData(BaseModel):
@@ -141,13 +141,13 @@ async def create_tag(body: GatewayHTTPRequest, db_conn=Depends(get_db)):
                 cursor.execute(
                     "INSERT INTO tags (mac, temperature, humidity, pressure, acceleration_x, acceleration_y, acceleration_z) VALUES (%s, %s, %s, %s, %s, %s, %s)",
                     (
-                        tag.mac,
+                        tag.id,
                         tag.temperature,
                         tag.humidity,
                         tag.pressure,
-                        tag.acceleration_x,
-                        tag.acceleration_y,
-                        tag.acceleration_z,
+                        tag.accelX,
+                        tag.accelY,
+                        tag.accelZ,
                     ),
                 )
         except Exception as e:

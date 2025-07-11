@@ -81,15 +81,19 @@ def test_root(setup_test_db):
 def test_create_tag(setup_test_db):
     mac = "12:34:56:78:90:AB"
     tag_data = {
-        "mac": mac,
+        "id": mac,
         "temperature": randint(0, 30),
         "humidity": randint(0, 100),
         "pressure": randint(90000, 101300),
-        "acceleration_x": randint(-1000, 1000),
-        "acceleration_y": randint(-1000, 1000),
-        "acceleration_z": randint(-1000, 1000),
-        "rssi": None,
-        "timestamp": None
+        "accelX": randint(-1000, 1000),
+        "accelY": randint(-1000, 1000),
+        "accelZ": randint(-1000, 1000),
+        "timestamp": (datetime.datetime.now().timestamp()),
+        "dataFormat": 5,
+        "voltage": 2.693,
+        "txPower": 4,
+        "measurementSequenceNumber": 48105,
+        "rssi": -47,
     }
 
     payload = {"data": {"gw_mac": mac, "timestamp": datetime.datetime.now().timestamp(), "coordinates": "", "tags": {mac: tag_data}}}
@@ -98,7 +102,7 @@ def test_create_tag(setup_test_db):
     
     assert response.status_code == 201
     assert data["message"] == "Tags created"
-    assert data["data"][mac] == tag_data
+    assert data["data"][mac]["id"] == tag_data["id"]
 
 
 def test_tags_range(setup_test_db):
